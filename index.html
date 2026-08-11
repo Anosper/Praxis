@@ -439,8 +439,8 @@ textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius
     <h1>Entrar</h1>
     <div class="login-error" id="login-error">Usuário ou senha inválidos.</div>
     <div class="field">
-      <label>Usuário</label>
-      <input id="login-user" type="text" autocomplete="username" placeholder="ex: admin">
+      <label>E-mail</label>
+      <input id="login-user" type="email" autocomplete="email" placeholder="ex: seuemail@gmail.com">
     </div>
     <div class="field">
       <label>Senha</label>
@@ -492,6 +492,29 @@ textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius
 </div>
 
 <div class="toast-wrap" id="toast-wrap"></div>
+
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDnZD-fwYxWluKxgr9cVIyAzRBUq33Iyys",
+    authDomain: "praxis-b3de2.firebaseapp.com",
+    projectId: "praxis-b3de2",
+    storageBucket: "praxis-b3de2.firebasestorage.app",
+    messagingSenderId: "556908524525",
+    appId: "1:556908524525:web:8fac3613a2e7336238ede4"
+  };
+
+  const firebaseApp = firebase.initializeApp(firebaseConfig);
+
+  const auth = firebaseApp.auth();
+  const firestore = firebaseApp.firestore();
+
+  console.log("🔥 Firebase conectado!");
+  console.log("Projeto:", firebaseApp.options.projectId);
+</script>
 
 <script>
 /* =========================================================================
@@ -612,7 +635,76 @@ function resetSessionFilters(){
 }
 function users(){ return DB.get('users', []); }
 function tasks(){ return DB.get('tasks', []); }
+
+async function loadTasksFromFirebase(){
+  const snapshot = await firestore.collection('tasks').get();
+
+  return snapshot.docs
+    .filter(doc => doc.id !== 'test')
+    .map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+}
+
+async function syncTasksFromFirebase(){
+  try {
+    const firebaseTasks = await loadTasksFromFirebase();
+
+    DB.set('tasks', firebaseTasks);
+
+    console.log(`✅ ${firebaseTasks.length} tarefa(s) sincronizada(s) do Firebase.`);
+
+    return firebaseTasks;
+  } catch(error) {
+    console.error('❌ Erro ao sincronizar tarefas:', error);
+    return null;
+  }
+}
+
+async function saveTaskToFirebase(task){
+  await firestore.collection('tasks').doc(task.id).set(task);
+}
+
 function alertsAll(){ return DB.get('alerts', []); }
+
+async function loadAlertsFromFirebase(){
+
+  try {
+
+    const currentUserId = state.currentUser.id;
+
+    const snapshot = await firestore
+      .collection('alerts')
+      .where('userId', '==', currentUserId)
+      .get();
+
+    const alerts = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    DB.set('alerts', alerts);
+
+    console.log(
+      `✅ ${alerts.length} alerta(s) do usuário carregado(s) do Firebase.`
+    );
+
+    updateAlertBadges();
+
+    return alerts;
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao carregar alertas do Firebase:',
+      error
+    );
+
+    return alertsAll();
+  }
+}
+
 function flowcharts(){ return DB.get('flowcharts', []); }
 function userById(id){ return users().find(u=>u.id===id); }
 function taskResponsibleIds(t){ return (t.responsibles||[]).map(r=>r.userId); }
@@ -639,17 +731,60 @@ function can(action, task){
 }
 
 /* ---------------- Auth ---------------- */
-function doLogin(){
-  const username = document.getElementById('login-user').value.trim();
+async function doLogin(){
+  const email = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
-  const u = users().find(x=>x.username===username && x.password===password);
   const err = document.getElementById('login-error');
-  if(!u){ err.style.display='block'; return; }
-  err.style.display='none';
-  state.currentUser = u;
-  resetSessionFilters();
-  DB.set('session', u.id);
-  enterApp();
+
+  err.style.display = 'none';
+
+  if(!email || !password){
+    err.textContent = 'Preencha o e-mail e a senha.';
+    err.style.display = 'block';
+    return;
+  }
+
+  try {
+    const credential = await auth.signInWithEmailAndPassword(email, password);
+    const firebaseUser = credential.user;
+
+    const doc = await firestore.collection('users').doc(firebaseUser.uid).get();
+
+    if(!doc.exists){
+      err.textContent = 'Perfil do usuário não encontrado.';
+      err.style.display = 'block';
+      await auth.signOut();
+      return;
+    }
+
+    const profile = doc.data();
+
+    const u = {
+      id: firebaseUser.uid,
+      name: profile.name || firebaseUser.email,
+      email: firebaseUser.email,
+      role: profile.role || 'comum',
+      initials: profile.initials || (profile.name || firebaseUser.email)
+        .split(' ')
+        .filter(Boolean)
+        .slice(0,2)
+        .map(w => w[0].toUpperCase())
+        .join('')
+    };
+
+    state.currentUser = u;
+    resetSessionFilters();
+
+    err.style.display = 'none';
+
+    enterApp();
+
+  } catch(error) {
+    console.error('Erro no login:', error);
+
+    err.textContent = 'E-mail ou senha inválidos.';
+    err.style.display = 'block';
+  }
 }
 function doLogout(){
   state.currentUser = null;
@@ -660,14 +795,21 @@ function doLogout(){
   document.getElementById('login-user').value='';
   document.getElementById('login-pass').value='';
 }
-function enterApp(){
+async function enterApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('active');
+
   document.getElementById('side-avatar').textContent = state.currentUser.initials;
   document.getElementById('side-name').textContent = state.currentUser.name;
   document.getElementById('side-role').textContent = ROLE_LABEL(state.currentUser.role);
+
   applyTheme();
   buildNav();
+
+  // Carrega as tarefas do Firebase antes de mostrar a área de trabalho
+  await syncTasksFromFirebase();
+  await loadAlertsFromFirebase();
+
   checkOverdue();
   navigate('workspace');
 }
@@ -753,13 +895,47 @@ function checkOverdue(){
   if(changed) DB.set('alerts', al);
   updateAlertBadges();
 }
-function pushAlert(userIds, kind, type, message, taskId){
+async function pushAlert(userIds, kind, type, message, taskId){
+
   const al = alertsAll();
-  [...new Set(userIds)].forEach(uidTo=>{
-    al.push({id:uid(), userId:uidTo, kind, type, taskId:taskId||null, message, read:false, createdAt:Date.now()});
-  });
-  DB.set('alerts', al);
-  updateAlertBadges();
+
+  const newAlerts = [...new Set(userIds)].map(uidTo => ({
+    id: uid(),
+    userId: uidTo,
+    kind,
+    type,
+    taskId: taskId || null,
+    message,
+    read: false,
+    createdAt: Date.now()
+  }));
+
+  try {
+
+    // Salva cada alerta no Firebase
+    await Promise.all(
+      newAlerts.map(alert =>
+        firestore.collection('alerts').doc(alert.id).set(alert)
+      )
+    );
+
+    // Mantém o armazenamento local sincronizado
+    al.push(...newAlerts);
+    DB.set('alerts', al);
+
+    console.log(
+      `✅ ${newAlerts.length} alerta(s) salvo(s) no Firebase.`
+    );
+
+    updateAlertBadges();
+
+  } catch(error) {
+
+    console.error('❌ Erro ao salvar alerta no Firebase:', error);
+
+    toast('Não foi possível salvar a notificação.');
+
+  }
 }
 function updateAlertBadges(){
   if(!state.currentUser) return;
@@ -864,29 +1040,98 @@ function renderWorkspace(){
   </div>`:''}
   `;
 }
-function toggleTask(id){
+async function toggleTask(id){
   const t = tasks();
   const task = t.find(x=>x.id===id);
-  if(!can('complete', task)) { toast('Você não tem permissão para concluir esta tarefa.'); return; }
-  task.status = task.status==='concluida' ? 'afazer' : 'concluida';
-  logHistory(task, task.status==='concluida' ? 'concluiu a tarefa' : 'reabriu a tarefa (voltou para A Fazer)');
-  DB.set('tasks', t);
-  if(task.status==='concluida'){
-    const notify = new Set([task.createdBy]);
-    users().filter(u=>u.role==='admin'||u.role==='supervisor').forEach(u=>notify.add(u.id));
-    pushAlert([...notify], 'concluido', 'ok', `"${task.title}" foi concluída por ${state.currentUser.name}.`, task.id);
+
+  if(!task){
+    toast('Tarefa não encontrada.');
+    return;
   }
-  renderView();
+
+  if(!can('complete', task)){
+    toast('Você não tem permissão para concluir esta tarefa.');
+    return;
+  }
+
+  task.status = task.status==='concluida'
+    ? 'afazer'
+    : 'concluida';
+
+  logHistory(
+    task,
+    task.status==='concluida'
+      ? 'concluiu a tarefa'
+      : 'reabriu a tarefa (voltou para A Fazer)'
+  );
+
+  try {
+    await saveTaskToFirebase(task);
+
+    DB.set('tasks', t);
+
+    console.log(
+      task.status==='concluida'
+        ? '✅ Tarefa concluída no Firebase:'
+        : '✅ Tarefa reaberta no Firebase:',
+      task.id
+    );
+
+    if(task.status==='concluida'){
+      const notify = new Set([task.createdBy]);
+
+      users()
+        .filter(u=>u.role==='admin'||u.role==='supervisor')
+        .forEach(u=>notify.add(u.id));
+
+      pushAlert(
+        [...notify],
+        'concluido',
+        'ok',
+        `"${task.title}" foi concluída por ${state.currentUser.name}.`,
+        task.id
+      );
+    }
+
+    renderView();
+
+  } catch(error) {
+    console.error('❌ Erro ao atualizar status no Firebase:', error);
+
+    toast('Não foi possível atualizar a tarefa no Firebase.');
+  }
 }
-function deleteTask(id){
+async function deleteTask(id){
   if(!confirm('Excluir esta tarefa/prazo definitivamente?')) return;
+
   let t = tasks();
   const task = t.find(x=>x.id===id);
-  if(!can('delete', task)){ toast('Você não tem permissão para excluir.'); return; }
-  t = t.filter(x=>x.id!==id);
-  DB.set('tasks', t);
-  toast('Tarefa excluída.');
-  renderView();
+
+  if(!task){
+    toast('Tarefa não encontrada.');
+    return;
+  }
+
+  if(!can('delete', task)){
+    toast('Você não tem permissão para excluir.');
+    return;
+  }
+
+  try {
+    await firestore.collection('tasks').doc(task.id).delete();
+
+    t = t.filter(x=>x.id!==id);
+    DB.set('tasks', t);
+
+    console.log('✅ Tarefa excluída do Firebase:', task.id);
+
+    toast('Tarefa excluída.');
+    renderView();
+
+  } catch(error) {
+    console.error('❌ Erro ao excluir tarefa do Firebase:', error);
+    toast('Não foi possível excluir a tarefa.');
+  }
 }
 
 /* ---- Task modal (create/edit) ---- */
@@ -988,7 +1233,7 @@ function closeModal(){
   const m = document.getElementById('modal-overlay');
   if(m) m.remove();
 }
-function saveTask(id){
+async function saveTask(id){
   const title = document.getElementById('tf-title').value.trim();
   if(!title){ toast('Informe um título.'); return; }
   const type = document.getElementById('tf-type').value;
@@ -1028,6 +1273,15 @@ function saveTask(id){
     const removedIds = [...prevResp].filter(uidX=>!responsibles.some(r=>r.userId===uidX));
     removedIds.forEach(uidX=>logHistory(task, `removeu ${userById(uidX)?.name||'—'} dos responsáveis`));
     DB.set('tasks', t);
+
+    try {
+      await saveTaskToFirebase(task);
+      console.log('✅ Tarefa editada e salva no Firebase:', task.id);
+    } catch(error) {
+      console.error('❌ Erro ao salvar edição no Firebase:', error);
+      toast('A tarefa foi alterada localmente, mas não foi salva no Firebase.');
+      return;
+    }
     const newlyAddedIds = newlyAdded.map(r=>r.userId);
     if(newlyAddedIds.length) pushAlert(newlyAddedIds,'atribuido','warn',`Você foi designado para "${title}".`, id);
     toast('Tarefa atualizada.');
@@ -1036,7 +1290,18 @@ function saveTask(id){
     logHistory(newTask, 'criou esta tarefa');
     responsibles.forEach(r=>{ if(r.userId!==state.currentUser.id) logHistory(newTask, `designou ${userById(r.userId)?.name||'—'}${r.role?` (${r.role})`:''} para a tarefa`); });
     t.push(newTask);
-    DB.set('tasks', t);
+
+    try {
+      await saveTaskToFirebase(newTask);
+      DB.set('tasks', t);
+
+      console.log('✅ Nova tarefa salva no Firebase:', newTask.id);
+    } catch(error) {
+      console.error('❌ Erro ao salvar tarefa no Firebase:', error);
+      toast('Não foi possível salvar a tarefa no Firebase.');
+      return;
+    }
+
     const notifyOthers = responsibles.map(r=>r.userId).filter(uid2=>uid2!==state.currentUser.id);
     if(notifyOthers.length) pushAlert(notifyOthers,'atribuido','warn',`${state.currentUser.name} atribuiu "${title}" a você.`, newTask.id);
     toast('Tarefa criada.');
@@ -1044,21 +1309,67 @@ function saveTask(id){
   closeModal();
   renderView();
 }
-function addComment(id){
+async function addComment(id){
+
   const input = document.getElementById('tf-comment');
   const text = input.value.trim();
+
   if(!text) return;
+
   let t = tasks();
   const task = t.find(x=>x.id===id);
+
+  if(!task){
+    toast('Tarefa não encontrada.');
+    return;
+  }
+
   task.comments = task.comments || [];
-  task.comments.push({userId:state.currentUser.id, text, at:Date.now()});
-  logHistory(task, `comentou: "${text.length>70?text.slice(0,70)+'…':text}"`);
-  DB.set('tasks', t);
-  const notify = new Set([...taskResponsibleIds(task), task.createdBy]);
-  notify.delete(state.currentUser.id);
-  pushAlert([...notify],'comentario','warn',`${state.currentUser.name} comentou em "${task.title}".`, id);
-  closeModal();
-  openTaskModal(id);
+
+  task.comments.push({
+    userId: state.currentUser.id,
+    text,
+    at: Date.now()
+  });
+
+  logHistory(
+    task,
+    `comentou: "${text.length>70 ? text.slice(0,70)+'…' : text}"`
+  );
+
+  try {
+
+    await saveTaskToFirebase(task);
+
+    DB.set('tasks', t);
+
+    console.log('✅ Comentário salvo no Firebase:', task.id);
+
+    const notify = new Set([
+      ...taskResponsibleIds(task),
+      task.createdBy
+    ]);
+
+    notify.delete(state.currentUser.id);
+
+    pushAlert(
+      [...notify],
+      'comentario',
+      'warn',
+      `${state.currentUser.name} comentou em "${task.title}".`,
+      id
+    );
+
+    closeModal();
+    openTaskModal(id);
+
+  } catch(error) {
+
+    console.error('❌ Erro ao salvar comentário no Firebase:', error);
+
+    toast('Não foi possível salvar o comentário.');
+
+  }
 }
 
 /* ================= AGENDA ================= */
@@ -1305,31 +1616,91 @@ function kbDragEnd(ev){
   document.querySelectorAll('.kanban-col.dragover').forEach(el=>el.classList.remove('dragover'));
 }
 function wireKanbanDom(){
+
   document.querySelectorAll('.kanban-col').forEach(col=>{
-    col.addEventListener('dragover', e=>{ e.preventDefault(); col.classList.add('dragover'); });
-    col.addEventListener('dragleave', ()=>{ col.classList.remove('dragover'); });
-    col.addEventListener('drop', e=>{
+
+    col.addEventListener('dragover', e=>{
       e.preventDefault();
+      col.classList.add('dragover');
+    });
+
+    col.addEventListener('dragleave', ()=>{
       col.classList.remove('dragover');
+    });
+
+    col.addEventListener('drop', async e=>{
+
+      e.preventDefault();
+
+      col.classList.remove('dragover');
+
       const taskId = e.dataTransfer.getData('text/plain');
       const newStatus = col.dataset.status;
+
       let t = tasks();
+
       const task = t.find(x=>x.id===taskId);
+
       if(!task) return;
-      if(!can('edit', task)){ toast('Você não tem permissão para mover esta tarefa.'); return; }
-      if(task.status===newStatus) return;
-      const prevStatus = task.status;
-      task.status = newStatus;
-      logHistory(task, `moveu de "${STATUS_LABEL[prevStatus]}" para "${STATUS_LABEL[newStatus]}"`);
-      DB.set('tasks', t);
-      if(newStatus==='concluida'){
-        const notify = new Set([task.createdBy]);
-        users().filter(u=>u.role==='admin'||u.role==='supervisor').forEach(u=>notify.add(u.id));
-        pushAlert([...notify], 'concluido', 'ok', `"${task.title}" foi concluída por ${state.currentUser.name}.`, task.id);
+
+      if(!can('edit', task)){
+        toast('Você não tem permissão para mover esta tarefa.');
+        return;
       }
-      renderView();
+
+      if(task.status===newStatus) return;
+
+      const prevStatus = task.status;
+
+      task.status = newStatus;
+
+      logHistory(
+        task,
+        `moveu de "${STATUS_LABEL[prevStatus]}" para "${STATUS_LABEL[newStatus]}"`
+      );
+
+      try {
+
+        await saveTaskToFirebase(task);
+
+        DB.set('tasks', t);
+
+        console.log('✅ Status atualizado pelo Kanban:', task.id);
+
+        if(newStatus==='concluida'){
+
+          const notify = new Set([task.createdBy]);
+
+          users()
+            .filter(u=>u.role==='admin'||u.role==='supervisor')
+            .forEach(u=>notify.add(u.id));
+
+          pushAlert(
+            [...notify],
+            'concluido',
+            'ok',
+            `"${task.title}" foi concluída por ${state.currentUser.name}.`,
+            task.id
+          );
+        }
+
+        renderView();
+
+      } catch(error) {
+
+        console.error(
+          '❌ Erro ao atualizar tarefa pelo Kanban:',
+          error
+        );
+
+        toast('Não foi possível atualizar a tarefa.');
+
+      }
+
     });
+
   });
+
 }
 
 /* ================= ALERTAS ================= */
