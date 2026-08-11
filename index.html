@@ -647,6 +647,39 @@ async function loadTasksFromFirebase(){
     }));
 }
 
+function listenTasksFromFirebase(){
+
+  firestore
+    .collection('tasks')
+    .onSnapshot(snapshot => {
+
+      const firebaseTasks = snapshot.docs
+        .filter(doc => doc.id !== 'test')
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+      DB.set('tasks', firebaseTasks);
+
+      console.log(
+        `🔄 Tarefas atualizadas em tempo real: ${firebaseTasks.length}`
+      );
+
+      // Atualiza a tela sem precisar dar F5
+      renderView();
+
+    }, error => {
+
+      console.error(
+        '❌ Erro no listener de tarefas do Firebase:',
+        error
+      );
+
+    });
+
+}
+
 async function syncTasksFromFirebase(){
   try {
     const firebaseTasks = await loadTasksFromFirebase();
@@ -810,13 +843,68 @@ async function enterApp(){
   await syncTasksFromFirebase();
   await loadAlertsFromFirebase();
 
+  listenTasksFromFirebase();
+
   checkOverdue();
   navigate('workspace');
 }
-(function restore(){
-  const sid = DB.get('session', null);
-  if(sid){ const u = userById(sid); if(u){ state.currentUser=u; setTimeout(enterApp,0); } }
-})();
+auth.onAuthStateChanged(async (firebaseUser) => {
+
+  if (!firebaseUser) {
+    console.log('ℹ️ Nenhum usuário autenticado.');
+    return;
+  }
+
+  try {
+
+    const doc = await firestore
+      .collection('users')
+      .doc(firebaseUser.uid)
+      .get();
+
+    if (!doc.exists) {
+      console.error('❌ Perfil do usuário não encontrado no Firestore.');
+      await auth.signOut();
+      return;
+    }
+
+    const firebaseData = doc.data();
+
+    // Procura o usuário correspondente no sistema PRAXIS
+    const localUser = userById(firebaseUser.uid);
+
+    if (localUser) {
+
+      state.currentUser = localUser;
+
+    } else {
+
+      // Caso o usuário ainda não esteja no armazenamento local,
+      // monta o usuário a partir do perfil do Firebase.
+      state.currentUser = {
+        id: firebaseUser.uid,
+        ...firebaseData
+      };
+
+    }
+
+    console.log(
+      '✅ Sessão Firebase restaurada:',
+      state.currentUser.name || firebaseUser.email
+    );
+
+    await enterApp();
+
+  } catch (error) {
+
+    console.error(
+      '❌ Erro ao restaurar sessão Firebase:',
+      error
+    );
+
+  }
+
+});
 
 /* ---------------- Theme ---------------- */
 function applyTheme(){
