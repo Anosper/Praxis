@@ -810,6 +810,34 @@ async function loadUsersFromFirebase(){
 
 }
 
+function listenUsersFromFirebase(){
+
+  firestore
+    .collection('users')
+    .onSnapshot(snapshot => {
+
+      const firebaseUsers = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      DB.set('users', firebaseUsers);
+
+      console.log(
+        `👥 Usuários atualizados em tempo real: ${firebaseUsers.length}`
+      );
+
+    }, error => {
+
+      console.error(
+        '❌ Erro no listener de usuários:',
+        error
+      );
+
+    });
+
+}
+
 function taskResponsibleIds(t){ return (t.responsibles||[]).map(r=>r.userId); }
 function isResponsible(t, userId){ return taskResponsibleIds(t).includes(userId); }
 function logHistory(task, message){
@@ -916,6 +944,7 @@ async function enterApp(){
   await syncTasksFromFirebase();
   await loadAlertsFromFirebase();
 
+  listenUsersFromFirebase();
   listenTasksFromFirebase();
   listenAlertsFromFirebase();
 
