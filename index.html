@@ -738,6 +738,39 @@ async function loadAlertsFromFirebase(){
   }
 }
 
+function listenAlertsFromFirebase(){
+
+  const currentUserId = state.currentUser.id;
+
+  firestore
+    .collection('alerts')
+    .where('userId', '==', currentUserId)
+    .onSnapshot(snapshot => {
+
+      const alerts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      DB.set('alerts', alerts);
+
+      console.log(
+        `🔔 Alertas atualizados em tempo real: ${alerts.length}`
+      );
+
+      updateAlertBadges();
+
+    }, error => {
+
+      console.error(
+        '❌ Erro no listener de alertas do Firebase:',
+        error
+      );
+
+    });
+
+}
+
 function flowcharts(){ return DB.get('flowcharts', []); }
 function userById(id){ return users().find(u=>u.id===id); }
 function taskResponsibleIds(t){ return (t.responsibles||[]).map(r=>r.userId); }
@@ -844,6 +877,7 @@ async function enterApp(){
   await loadAlertsFromFirebase();
 
   listenTasksFromFirebase();
+  listenAlertsFromFirebase();
 
   checkOverdue();
   navigate('workspace');
