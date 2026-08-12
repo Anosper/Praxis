@@ -1965,12 +1965,53 @@ function renderFlowList(){
     </div>`).join('')}</div>` : `<div class="card"><div class="empty-state"><p>Nenhum fluxograma criado ainda. Comece um novo procedimento acima.</p></div></div>`}
   `;
 }
-function createFlowchart(){
-  const list = flowcharts();
-  const f = {id:uid(), name:'Novo fluxograma', nodes:[{id:uid(), x:100, y:100, text:'Início'}], edges:[]};
-  list.push(f);
-  DB.set('flowcharts', list);
-  editFlowchart(f.id);
+async function createFlowchart(){
+
+  const f = {
+    id: uid(),
+    name: 'Novo fluxograma',
+    nodes: [
+      {
+        id: uid(),
+        x: 100,
+        y: 100,
+        text: 'Início'
+      }
+    ],
+    edges: [],
+    createdBy: state.currentUser.id,
+    createdAt: Date.now()
+  };
+
+  try {
+
+    // Salva no Firebase
+    await firestore
+      .collection('flowcharts')
+      .doc(f.id)
+      .set(f);
+
+    // Atualiza também o armazenamento local
+    const list = flowcharts();
+    list.push(f);
+    DB.set('flowcharts', list);
+
+    console.log(
+      '✅ Fluxograma criado e salvo no Firebase:',
+      f.id
+    );
+
+    editFlowchart(f.id);
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao salvar fluxograma no Firebase:',
+      error
+    );
+
+    toast('Não foi possível salvar o fluxograma.');
+  }
 }
 function deleteFlowchart(id){
   if(!confirm('Excluir este fluxograma?')) return;
