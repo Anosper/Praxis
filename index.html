@@ -773,6 +773,40 @@ function listenAlertsFromFirebase(){
 
 function flowcharts(){ return DB.get('flowcharts', []); }
 function userById(id){ return users().find(u=>u.id===id); }
+
+async function loadUsersFromFirebase(){
+
+  try {
+
+    const snapshot = await firestore
+      .collection('users')
+      .get();
+
+    const firebaseUsers = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    DB.set('users', firebaseUsers);
+
+    console.log(
+      `👥 ${firebaseUsers.length} usuário(s) carregado(s) do Firebase.`
+    );
+
+    return firebaseUsers;
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao carregar usuários do Firebase:',
+      error
+    );
+
+    return users();
+  }
+
+}
+
 function taskResponsibleIds(t){ return (t.responsibles||[]).map(r=>r.userId); }
 function isResponsible(t, userId){ return taskResponsibleIds(t).includes(userId); }
 function logHistory(task, message){
@@ -870,6 +904,9 @@ async function enterApp(){
   document.getElementById('side-role').textContent = ROLE_LABEL(state.currentUser.role);
 
   applyTheme();
+
+  await loadUsersFromFirebase();
+
   buildNav();
 
   // Carrega as tarefas do Firebase antes de mostrar a área de trabalho
