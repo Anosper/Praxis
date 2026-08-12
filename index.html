@@ -775,6 +775,40 @@ function listenAlertsFromFirebase(){
 }
 
 function flowcharts(){ return DB.get('flowcharts', []); }
+
+async function loadFlowchartsFromFirebase(){
+
+  try {
+
+    const snapshot = await firestore
+      .collection('flowcharts')
+      .get();
+
+    const firebaseFlowcharts = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    DB.set('flowcharts', firebaseFlowcharts);
+
+    console.log(
+      `🔄 ${firebaseFlowcharts.length} fluxograma(s) carregado(s) do Firebase.`
+    );
+
+    return firebaseFlowcharts;
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao carregar fluxogramas do Firebase:',
+      error
+    );
+
+    return flowcharts();
+  }
+
+}
+
 function userById(id){ return users().find(u=>u.id===id); }
 
 async function loadUsersFromFirebase(){
@@ -943,6 +977,7 @@ async function enterApp(){
   // Carrega as tarefas do Firebase antes de mostrar a área de trabalho
   await syncTasksFromFirebase();
   await loadAlertsFromFirebase();
+  await loadFlowchartsFromFirebase();
 
   listenUsersFromFirebase();
   listenTasksFromFirebase();
