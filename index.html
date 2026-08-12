@@ -512,6 +512,9 @@ textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius
   const auth = firebaseApp.auth();
   const firestore = firebaseApp.firestore();
 
+  const secondaryApp = firebase.initializeApp(firebaseConfig, 'Secondary');
+  const secondaryAuth = secondaryApp.auth();
+
   console.log("🔥 Firebase conectado!");
   console.log("Projeto:", firebaseApp.options.projectId);
 </script>
@@ -2363,20 +2366,121 @@ function openNewUserModal(){
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
 }
-function createUser(){
+async function createUser(){
+
   const name = document.getElementById('nu-name').value.trim();
-  const username = document.getElementById('nu-username').value.trim();
+  const email = document.getElementById('nu-username').value.trim();
   const password = document.getElementById('nu-pass').value;
   const role = document.getElementById('nu-role').value;
-  if(!name || !username || !password){ toast('Preencha todos os campos.'); return; }
-  if(users().some(u=>u.username===username)){ toast('Este usuário já existe.'); return; }
-  const initials = name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-  let list = users();
-  list.push({id:uid(), name, username, password, role, initials});
-  DB.set('users', list);
-  toast('Usuário criado.');
-  closeModal();
-  renderView();
+
+  if(!name || !email || !password){
+    toast('Preencha todos os campos.');
+    return;
+  }
+
+  if(!email.includes('@')){
+    toast('Informe um e-mail válido.');
+    return;
+  }
+
+  if(password.length < 6){
+    toast('A senha deve ter pelo menos 6 caracteres.');
+    return;
+  }
+
+  try {
+
+    // Verifica se já existe um perfil com este e-mail
+    const existing = users().some(
+      u => (u.email || '').toLowerCase() === email.toLowerCase()
+    );
+
+    if(existing){
+      toast('Este e-mail já está cadastrado.');
+      return;
+    }
+
+    const initials = name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0,2)
+      .map(w => w[0].toUpperCase())
+      .join('');
+
+    console.log('👤 Criando usuário no Firebase:', email);
+
+    // Cria o usuário no Firebase Authentication
+    // usando a segunda instância para não deslogar o administrador
+    const credential =
+      await secondaryAuth.createUserWithEmailAndPassword(
+        email,
+        password
+      );
+
+    const firebaseUser = credential.user;
+
+    console.log(
+      '✅ Usuário criado no Firebase Authentication:',
+      firebaseUser.uid
+    );
+
+    // Perfil do usuário no Firestore
+    const userData = {
+      email: email,
+      name: name,
+      initials: initials,
+      role: role
+    };
+
+    await firestore
+      .collection('users')
+      .doc(firebaseUser.uid)
+      .set(userData);
+
+    console.log(
+      '✅ Perfil criado no Firestore:',
+      firebaseUser.uid
+    );
+
+    // Atualiza a lista local usada pelo PRAXIS
+    const list = users();
+
+    list.push({
+      id: firebaseUser.uid,
+      ...userData
+    });
+
+    DB.set('users', list);
+
+    toast('Usuário criado com sucesso.');
+
+    closeModal();
+    renderView();
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao criar usuário:',
+      error
+    );
+
+    let message = 'Não foi possível criar o usuário.';
+
+    if(error.code === 'auth/email-already-in-use'){
+      message = 'Este e-mail já está cadastrado no Firebase.';
+    }
+    else if(error.code === 'auth/invalid-email'){
+      message = 'O e-mail informado é inválido.';
+    }
+    else if(error.code === 'auth/weak-password'){
+      message = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
+    }
+    else if(error.code === 'permission-denied'){
+      message = 'O Firebase não permitiu criar o perfil do usuário.';
+    }
+
+    toast(message);
+  }
 }
 
 /* ================= BUSCA GLOBAL ================= */
