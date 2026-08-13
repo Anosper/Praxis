@@ -2067,11 +2067,12 @@ function renderAlerts(){
   // Atualiza cada alerta no Firebase
   unreadOwn.forEach(a => {
     firestore
-      .collection('alerts')
-      .doc(a.id)
-      .update({
-        read: true
-      })
+    .collection('alerts')
+    .doc(a.id)
+    .set({
+      ...a,
+      read: true
+    }, { merge: true })
       .catch(error => {
         console.error(
           '❌ Erro ao marcar alerta como lido no Firebase:',
