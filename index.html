@@ -2278,65 +2278,200 @@ function flowDragEnd(){
 }
 
 function wireNode(el, nid){
+
   const textEl = el.querySelector('.node-text');
   const delBtn = el.querySelector('.del-node');
 
-  el.addEventListener('mouseenter', ()=>el.classList.add('hovered'));
-  el.addEventListener('mouseleave', ()=>el.classList.remove('hovered'));
+  // Usuário comum: somente visualização
+  const canEditFlow = can('edit');
 
-  delBtn.addEventListener('click', e=>{ e.stopPropagation(); deleteFlowNode(nid); });
+  el.addEventListener('mouseenter', ()=>{
+    el.classList.add('hovered');
+  });
+
+  el.addEventListener('mouseleave', ()=>{
+    el.classList.remove('hovered');
+  });
+
+
+  // Excluir etapa
+  delBtn.addEventListener('click', e=>{
+    e.stopPropagation();
+
+    if(!canEditFlow){
+      toast('Você não tem permissão para editar fluxogramas.');
+      return;
+    }
+
+    deleteFlowNode(nid);
+  });
+
 
   function enterEdit(){
+
+    if(!canEditFlow){
+      toast('Você não tem permissão para editar fluxogramas.');
+      return;
+    }
+
     textEl.contentEditable = 'true';
     textEl.classList.add('editing');
     el.classList.add('editing');
+
     textEl.focus();
+
     const range = document.createRange();
     range.selectNodeContents(textEl);
+
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
   }
+
+
   function exitEdit(){
+
     textEl.contentEditable = 'false';
     textEl.classList.remove('editing');
     el.classList.remove('editing');
-    updateNodeText(nid, textEl.innerText.trim() || 'Etapa');
-  }
-  textEl.addEventListener('dblclick', e=>{ e.stopPropagation(); enterEdit(); });
-  textEl.addEventListener('blur', exitEdit);
-  textEl.addEventListener('keydown', e=>{
-    if(e.key==='Enter'){ e.preventDefault(); textEl.blur(); }
-    if(e.key==='Escape'){ e.preventDefault(); textEl.blur(); }
-  });
-  textEl.addEventListener('mousedown', e=>{ if(textEl.isContentEditable) e.stopPropagation(); });
 
-  // Drag node (click-and-hold anywhere on the node, except handles/delete/editing text)
-  function startDrag(clientX, clientY){
-    flowDragState = {nid, el, sx:clientX, sy:clientY, ox:parseFloat(el.style.left), oy:parseFloat(el.style.top), moved:false};
+    if(canEditFlow){
+      updateNodeText(
+        nid,
+        textEl.innerText.trim() || 'Etapa'
+      );
+    }
   }
-  el.addEventListener('mousedown', e=>{
-    if(e.target.classList.contains('flow-handle') || e.target===delBtn) return;
-    if(textEl.isContentEditable) return;
-    startDrag(e.clientX, e.clientY);
+
+
+  textEl.addEventListener('dblclick', e=>{
+    e.stopPropagation();
+
+    if(!canEditFlow){
+      return;
+    }
+
+    enterEdit();
   });
-  el.addEventListener('touchstart', e=>{
-    if(e.target.classList.contains('flow-handle') || e.target===delBtn) return;
+
+
+  textEl.addEventListener('blur', exitEdit);
+
+
+  textEl.addEventListener('keydown', e=>{
+
+    if(!canEditFlow) return;
+
+    if(e.key==='Enter'){
+      e.preventDefault();
+      textEl.blur();
+    }
+
+    if(e.key==='Escape'){
+      e.preventDefault();
+      textEl.blur();
+    }
+
+  });
+
+
+  textEl.addEventListener('mousedown', e=>{
+    if(textEl.isContentEditable){
+      e.stopPropagation();
+    }
+  });
+
+
+  // Drag node
+  function startDrag(clientX, clientY){
+
+    if(!canEditFlow) return;
+
+    flowDragState = {
+      nid,
+      el,
+      sx:clientX,
+      sy:clientY,
+      ox:parseFloat(el.style.left),
+      oy:parseFloat(el.style.top),
+      moved:false
+    };
+  }
+
+
+  el.addEventListener('mousedown', e=>{
+
+    if(!canEditFlow) return;
+
+    if(
+      e.target.classList.contains('flow-handle') ||
+      e.target===delBtn
+    ) return;
+
     if(textEl.isContentEditable) return;
-    startDrag(e.touches[0].clientX, e.touches[0].clientY);
+
+    startDrag(
+      e.clientX,
+      e.clientY
+    );
+  });
+
+
+  el.addEventListener('touchstart', e=>{
+
+    if(!canEditFlow) return;
+
+    if(
+      e.target.classList.contains('flow-handle') ||
+      e.target===delBtn
+    ) return;
+
+    if(textEl.isContentEditable) return;
+
+    startDrag(
+      e.touches[0].clientX,
+      e.touches[0].clientY
+    );
+
   }, {passive:true});
+
 
   // Connection handles
   el.querySelectorAll('.flow-handle').forEach(handle=>{
+
     const startConnect = (ev)=>{
+
+      if(!canEditFlow) return;
+
       ev.stopPropagation();
-      if(ev.cancelable) ev.preventDefault();
+
+      if(ev.cancelable){
+        ev.preventDefault();
+      }
+
       el.classList.add('connecting');
-      beginEdgeDraw(nid, ev, ()=>el.classList.remove('connecting'));
+
+      beginEdgeDraw(
+        nid,
+        ev,
+        ()=>el.classList.remove('connecting')
+      );
     };
-    handle.addEventListener('mousedown', startConnect);
-    handle.addEventListener('touchstart', startConnect, {passive:false});
+
+
+    handle.addEventListener(
+      'mousedown',
+      startConnect
+    );
+
+    handle.addEventListener(
+      'touchstart',
+      startConnect,
+      {passive:false}
+    );
+
   });
+
 }
 
 function updateNodeText(nid, text){
