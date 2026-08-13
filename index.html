@@ -700,29 +700,64 @@ function listenFlowchartsFromFirebase(){
         `🔄 ${firebaseFlowcharts.length} fluxograma(s) atualizado(s) em tempo real.`
       );
 
-      // Se existe um fluxograma aberto, verifica
-      // se ele foi alterado no Firebase
+
+      // ==========================================
+      // FLUXOGRAMA ABERTO
+      // ==========================================
+
       if(activeFlow){
 
         const updatedFlow = firebaseFlowcharts.find(
           f => f.id === activeFlow.id
         );
 
-        if(updatedFlow){
 
-          // Atualiza o fluxograma aberto
-          activeFlow = JSON.parse(
-            JSON.stringify(updatedFlow)
-          );
-
-          renderFlowCanvas();
+        // O fluxograma que estava aberto foi excluído
+        if(!updatedFlow){
 
           console.log(
-            '🔄 Fluxograma aberto atualizado em tempo real:',
-            activeFlow.id
+            '🗑️ O fluxograma aberto foi excluído por outro usuário.'
           );
 
+          const editor = document.getElementById('flow-editor');
+
+          if(editor){
+            editor.remove();
+          }
+
+          activeFlow = null;
+          flowDragState = null;
+
+          toast(
+            'Este fluxograma foi excluído por outro usuário.'
+          );
+
+          renderView();
+
+          return;
         }
+
+
+        // O fluxograma continua existindo,
+        // então atualiza o editor aberto
+        activeFlow = JSON.parse(
+          JSON.stringify(updatedFlow)
+        );
+
+        renderFlowCanvas();
+
+        console.log(
+          '🔄 Fluxograma aberto atualizado em tempo real:',
+          activeFlow.id
+        );
+
+      } else {
+
+        // ==========================================
+        // USUÁRIO ESTÁ NA LISTA DE FLUXOGRAMAS
+        // ==========================================
+
+        renderView();
 
       }
 
