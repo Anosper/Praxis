@@ -309,6 +309,21 @@ select.pill,.pill-select{
 .alert-item:last-child{border-bottom:none;}
 .alert-item.unread{background:#f3ecdd;}
 [data-theme="dark"] .alert-item.unread{background:#241f13;}
+.alert-item:not(.unread){
+  opacity:0.65;
+}
+
+.alert-item:not(.unread) .alert-text{
+  color:var(--ink-soft);
+}
+
+.alert-item:not(.unread) .alert-icon{
+  opacity:0.7;
+}
+
+.alert-item.unread .alert-text{
+  font-weight:600;
+}
 .alert-icon{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--navy-700);color:#fff;}
 .alert-icon svg{width:16px;height:16px;}
 .alert-icon.danger{background:var(--danger);}
