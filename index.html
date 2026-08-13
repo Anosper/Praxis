@@ -1107,7 +1107,9 @@ async function enterApp(){
   listenFlowchartsFromFirebase();
 
   checkOverdue();
-  navigate('workspace');
+  
+  const lastView = DB.get('lastView', 'workspace');
+  navigate(lastView);
 }
 auth.onAuthStateChanged(async (firebaseUser) => {
 
@@ -1213,11 +1215,37 @@ function closeMobileSidebar(){
   document.getElementById('scrim').classList.remove('show');
 }
 function navigate(view){
+
   state.view = view;
-  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active', b.dataset.nav===view));
-  const titles = {workspace:'Área de trabalho', agenda:'Agenda', kanban:'Gestão Kanban', alertas:'Alertas', fluxograma:'Fluxograma', configuracoes:'Configurações'};
-  document.getElementById('topbar-title').textContent = titles[view] || '';
-  if(window.innerWidth<=880) closeMobileSidebar();
+
+  // Guarda a última área visitada
+  DB.set('lastView', view);
+
+  document
+    .querySelectorAll('[data-nav]')
+    .forEach(b =>
+      b.classList.toggle(
+        'active',
+        b.dataset.nav === view
+      )
+    );
+
+  const titles = {
+    workspace:'Área de trabalho',
+    agenda:'Agenda',
+    kanban:'Gestão Kanban',
+    alertas:'Alertas',
+    fluxograma:'Fluxograma',
+    configuracoes:'Configurações'
+  };
+
+  document.getElementById('topbar-title').textContent =
+    titles[view] || '';
+
+  if(window.innerWidth <= 880){
+    closeMobileSidebar();
+  }
+
   renderView();
 }
 
