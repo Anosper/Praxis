@@ -2122,13 +2122,27 @@ async function deleteFlowchart(id){
 function editFlowchart(id){
   const f = flowcharts().find(x=>x.id===id);
   activeFlow = JSON.parse(JSON.stringify(f));
+
+  const canEditFlow = can('edit');
+
   const overlay = document.createElement('div');
   overlay.className='flow-editor';
   overlay.id='flow-editor';
   overlay.innerHTML = `
     <div class="flow-toolbar">
-      <input id="flow-name" value="${escapeHtml(activeFlow.name)}" onchange="renameFlow(this.value)">
-      <button class="btn btn-ghost btn-small" onclick="addFlowNode()">+ Etapa</button>
+      ${canEditFlow ? `
+  <input id="flow-name"
+         value="${escapeHtml(activeFlow.name)}"
+         onchange="renameFlow(this.value)">
+` : `
+  <span class="flow-name-view">
+    ${escapeHtml(activeFlow.name)}
+  </span>
+`}
+
+      ${canEditFlow ? `
+  <button class="btn btn-ghost btn-small" onclick="addFlowNode()">+ Etapa</button>
+` : ''}
       <span class="flow-hint">Duplo-clique numa etapa para renomear. Passe o mouse sobre a etapa e arraste a bolinha dourada da borda até outra etapa para conectar. Clique numa seta para excluí-la.</span>
       <button class="btn btn-primary btn-small" onclick="closeFlowEditor()">Concluir</button>
     </div>
