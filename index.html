@@ -744,7 +744,25 @@ function listenFlowchartsFromFirebase(){
           JSON.stringify(updatedFlow)
         );
 
+        // Atualiza o nome do fluxograma que está aberto
+        const flowNameInput = document.getElementById('flow-name');
+
+        if(flowNameInput){
+          flowNameInput.value = activeFlow.name || 'Sem nome';
+        }
+
+        const flowNameView = document.querySelector('.flow-name-view');
+
+        if(flowNameView){
+          flowNameView.textContent = activeFlow.name || 'Sem nome';
+        }
+
         renderFlowCanvas();
+
+        console.log(
+          '🔄 Fluxograma aberto atualizado em tempo real:',
+          activeFlow.id
+        );
 
         console.log(
           '🔄 Fluxograma aberto atualizado em tempo real:',
