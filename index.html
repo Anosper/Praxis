@@ -2054,80 +2054,330 @@ function wireKanbanDom(){
 
 /* ================= ALERTAS ================= */
 function renderAlerts(){
-  const cu = state.currentUser;
-  const canSeeOthers = cu.role!=='comum';
-  const filter = canSeeOthers ? (state.alertsFilterUser || 'mine') : 'mine';
-  let mine = alertsAll();
-  if(filter==='mine') mine = mine.filter(a=>a.userId===cu.id);
-  else if(filter!=='all') mine = mine.filter(a=>a.userId===filter);
-  mine = mine.sort((a,b)=>b.createdAt-a.createdAt);
 
-  // Só marca como lidos os alertas que realmente são do usuário logado
-  const own = alertsAll().filter(a=>a.userId===cu.id);
-  if(own.some(a=>!a.read)){
+  const cu = state.currentUser;
+  const canSeeOthers = cu.role !== 'comum';
+
+  const filter = canSeeOthers
+    ? (state.alertsFilterUser || 'mine')
+    : 'mine';
+
+  let mine = alertsAll();
+
+  if(filter === 'mine'){
+    mine = mine.filter(a => a.userId === cu.id);
+
+  } else if(filter !== 'all'){
+    mine = mine.filter(a => a.userId === filter);
+  }
+
+  mine = mine.sort(
+    (a,b) => b.createdAt - a.createdAt
+  );
+
+
+  const iconFor = (kind) => {
+
+    if(kind === 'atraso'){
+      return {
+        cls:'danger',
+        svg:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
+      };
+    }
+
+    if(kind === 'concluido'){
+      return {
+        cls:'ok',
+        svg:'<polyline points="20 6 9 17 4 12"/>'
+      };
+    }
+
+    if(kind === 'atribuido'){
+      return {
+        cls:'warn',
+        svg:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+      };
+    }
+
+    return {
+      cls:'warn',
+      svg:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+    };
+  };
+
+
+  return `
+
+  <div class="view-head">
+
+    <div>
+      <h2>Alertas</h2>
+      <p>
+        Notificações de atrasos, atribuições,
+        comentários e conclusões
+      </p>
+    </div>
+
+  </div>
+
+
+  ${canSeeOthers ? `
+
+    <div class="filter-row">
+
+      <select
+        class="pill-select"
+        onchange="state.alertsFilterUser=this.value; renderView();">
+
+        <option
+          value="mine"
+          ${filter === 'mine' ? 'selected' : ''}>
+          Meus alertas
+        </option>
+
+        <option
+          value="all"
+          ${filter === 'all' ? 'selected' : ''}>
+          Todos
+        </option>
+
+        ${users()
+          .filter(u => u.id !== cu.id)
+          .map(u => `
+            <option
+              value="${u.id}"
+              ${filter === u.id ? 'selected' : ''}>
+              ${u.name} — ${ROLE_LABEL(u.role)}
+            </option>
+          `)
+          .join('')
+        }
+
+      </select>
+
+    </div>
+
+  ` : ''}
+
+
+  <div class="card">
+
+    ${
+      mine.length
+
+      ? mine.map(a => {
+
+          const ic = iconFor(a.kind);
+
+          const ownerTag =
+            (filter !== 'mine' && a.userId !== cu.id)
+
+            ? `
+              <span
+                style="
+                  font-size:10.5px;
+                  color:var(--ink-soft);
+                  font-weight:700;
+                  text-transform:uppercase;
+                  letter-spacing:.03em;
+                ">
+                ${escapeHtml(userById(a.userId)?.name || '—')}
+              </span>
+              <br>
+            `
+
+            : '';
+
+
+          return `
+
+            <div
+              class="alert-item ${!a.read ? 'unread' : ''}"
+              data-alert-id="${a.id}">
+
+              <div class="alert-icon ${ic.cls}">
+
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round">
+
+                  ${ic.svg}
+
+                </svg>
+
+              </div>
+
+
+              <div style="flex:1;">
+
+                ${ownerTag}
+
+                <div
+                  class="alert-text"
+                  ${
+                    a.taskId
+                    ? `style="cursor:pointer"
+                       onclick="openAlertTask('${a.id}','${a.taskId}')"`
+                    : `style="cursor:pointer"
+                       onclick="markAlertAsRead('${a.id}')"`
+                  }>
+
+                  ${escapeHtml(a.message)}
+
+                </div>
+
+                <div class="alert-time">
+                  ${timeAgo(a.createdAt)}
+                </div>
+
+              </div>
+
+
+              <button
+                class="alert-delete"
+                type="button"
+                title="Excluir alerta"
+                onclick="event.stopPropagation(); deleteAlert('${a.id}')">
+
+                🗑️
+
+              </button>
+
+            </div>
+
+          `;
+
+        }).join('')
+
+      : `
+
+        <div class="empty-state">
+
+          <p>Nenhum alerta por aqui.</p>
+
+        </div>
+
+      `
+    }
+
+  </div>
+
+  `;
+}
+
+async function markAlertAsRead(id){
 
   const all = alertsAll();
 
-  const unreadOwn = all.filter(
-    a => a.userId === cu.id && !a.read
-  );
+  const alert = all.find(a => a.id === id);
 
-  unreadOwn.forEach(a => {
-    a.read = true;
-  });
+  if(!alert) return;
 
-  // Atualiza o armazenamento local
+  if(alert.userId !== state.currentUser.id){
+    return;
+  }
+
+  if(alert.read){
+    return;
+  }
+
+  alert.read = true;
+
   DB.set('alerts', all);
 
-  // Atualiza cada alerta no Firebase
-  unreadOwn.forEach(a => {
-    firestore
-    .collection('alerts')
-    .doc(a.id)
-    .set({
-      ...a,
-      read: true
-    }, { merge: true })
-      .catch(error => {
-        console.error(
-          '❌ Erro ao marcar alerta como lido no Firebase:',
-          error
-        );
-      });
-  });
+  try {
 
-  updateAlertBadges();
+    await firestore
+      .collection('alerts')
+      .doc(id)
+      .set({
+        read: true
+      }, { merge: true });
+
+    console.log(
+      '✅ Alerta marcado como lido:',
+      id
+    );
+
+    updateAlertBadges();
+
+    renderView();
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao marcar alerta como lido:',
+      error
+    );
+
+    // Se não conseguiu salvar no Firebase,
+    // volta para não lido localmente.
+    alert.read = false;
+
+    DB.set('alerts', all);
+
+    updateAlertBadges();
+  }
 }
-  const iconFor = (kind)=>{
-    if(kind==='atraso') return {cls:'danger', svg:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'};
-    if(kind==='concluido') return {cls:'ok', svg:'<polyline points="20 6 9 17 4 12"/>'};
-    if(kind==='atribuido') return {cls:'warn', svg:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'};
-    return {cls:'warn', svg:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'};
-  };
-  return `
-  <div class="view-head"><div><h2>Alertas</h2><p>Notificações de atrasos, atribuições, comentários e conclusões</p></div></div>
-  ${canSeeOthers ? `
-  <div class="filter-row">
-    <select class="pill-select" onchange="state.alertsFilterUser=this.value; renderView();">
-      <option value="mine" ${filter==='mine'?'selected':''}>Meus alertas</option>
-      <option value="all" ${filter==='all'?'selected':''}>Todos</option>
-      ${users().filter(u=>u.id!==cu.id).map(u=>`<option value="${u.id}" ${filter===u.id?'selected':''}>${u.name} — ${ROLE_LABEL(u.role)}</option>`).join('')}
-    </select>
-  </div>` : ''}
-  <div class="card">
-    ${mine.length ? mine.map(a=>{
-      const ic = iconFor(a.kind);
-      const ownerTag = (filter!=='mine' && a.userId!==cu.id) ? `<span style="font-size:10.5px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(userById(a.userId)?.name||'—')}</span><br>` : '';
-      return `<div class="alert-item ${!a.read?'unread':''}">
-        <div class="alert-icon ${ic.cls}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic.svg}</svg></div>
-        <div style="flex:1;">
-          ${ownerTag}
-          <div class="alert-text" ${a.taskId?`style="cursor:pointer" onclick="openTaskModal('${a.taskId}')"`:''}>${escapeHtml(a.message)}</div>
-          <div class="alert-time">${timeAgo(a.createdAt)}</div>
-        </div>
-      </div>`;
-    }).join('') : `<div class="empty-state"><p>Nenhum alerta por aqui.</p></div>`}
-  </div>`;
+
+async function deleteAlert(id){
+
+  const all = alertsAll();
+
+  const alert = all.find(a => a.id === id);
+
+  if(!alert) return;
+
+  if(alert.userId !== state.currentUser.id){
+    return;
+  }
+
+  try {
+
+    await firestore
+      .collection('alerts')
+      .doc(id)
+      .delete();
+
+    const updated = all.filter(
+      a => a.id !== id
+    );
+
+    DB.set('alerts', updated);
+
+    console.log(
+      '🗑️ Alerta excluído:',
+      id
+    );
+
+    updateAlertBadges();
+
+    renderView();
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao excluir alerta:',
+      error
+    );
+
+    toast(
+      'Não foi possível excluir o alerta.'
+    );
+  }
+}
+
+function openAlertTask(alertId, taskId){
+
+  markAlertAsRead(alertId);
+
+  if(taskId){
+    openTaskModal(taskId);
+  }
 }
 
 /* ================= FLUXOGRAMA ================= */
