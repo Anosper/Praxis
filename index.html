@@ -2083,12 +2083,49 @@ function closeFlowEditor(){
   flowDragState = null;
   renderView();
 }
-function persistActiveFlow(){
+async function persistActiveFlow(){
+
   if(!activeFlow) return;
+
   let list = flowcharts();
-  const idx = list.findIndex(x=>x.id===activeFlow.id);
-  if(idx>-1) list[idx] = JSON.parse(JSON.stringify(activeFlow));
+
+  const idx = list.findIndex(
+    x => x.id === activeFlow.id
+  );
+
+  if(idx > -1){
+    list[idx] = JSON.parse(
+      JSON.stringify(activeFlow)
+    );
+  }
+
+  // Mantém a cópia local atualizada
   DB.set('flowcharts', list);
+
+  try {
+
+    // Salva a versão atualizada no Firebase
+    await firestore
+      .collection('flowcharts')
+      .doc(activeFlow.id)
+      .set(activeFlow);
+
+    console.log(
+      '✅ Fluxograma salvo no Firebase:',
+      activeFlow.id
+    );
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao salvar fluxograma no Firebase:',
+      error
+    );
+
+    toast(
+      'Não foi possível salvar o fluxograma no Firebase.'
+    );
+  }
 }
 function renameFlow(name){
   activeFlow.name = name || 'Sem nome';
