@@ -2050,11 +2050,38 @@ function renderAlerts(){
   // Só marca como lidos os alertas que realmente são do usuário logado
   const own = alertsAll().filter(a=>a.userId===cu.id);
   if(own.some(a=>!a.read)){
-    const all = alertsAll();
-    all.forEach(a=>{ if(a.userId===cu.id) a.read=true; });
-    DB.set('alerts', all);
-    updateAlertBadges();
-  }
+
+  const all = alertsAll();
+
+  const unreadOwn = all.filter(
+    a => a.userId === cu.id && !a.read
+  );
+
+  unreadOwn.forEach(a => {
+    a.read = true;
+  });
+
+  // Atualiza o armazenamento local
+  DB.set('alerts', all);
+
+  // Atualiza cada alerta no Firebase
+  unreadOwn.forEach(a => {
+    firestore
+      .collection('alerts')
+      .doc(a.id)
+      .update({
+        read: true
+      })
+      .catch(error => {
+        console.error(
+          '❌ Erro ao marcar alerta como lido no Firebase:',
+          error
+        );
+      });
+  });
+
+  updateAlertBadges();
+}
   const iconFor = (kind)=>{
     if(kind==='atraso') return {cls:'danger', svg:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'};
     if(kind==='concluido') return {cls:'ok', svg:'<polyline points="20 6 9 17 4 12"/>'};
