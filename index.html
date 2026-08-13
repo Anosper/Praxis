@@ -683,6 +683,34 @@ function listenTasksFromFirebase(){
 
 }
 
+function listenFlowchartsFromFirebase(){
+
+  firestore
+    .collection('flowcharts')
+    .onSnapshot(snapshot => {
+
+      const firebaseFlowcharts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      DB.set('flowcharts', firebaseFlowcharts);
+
+      console.log(
+        `🔄 ${firebaseFlowcharts.length} fluxograma(s) atualizado(s) em tempo real.`
+      );
+
+    }, error => {
+
+      console.error(
+        '❌ Erro no listener de fluxogramas:',
+        error
+      );
+
+    });
+
+}
+
 async function syncTasksFromFirebase(){
   try {
     const firebaseTasks = await loadTasksFromFirebase();
@@ -982,6 +1010,7 @@ async function enterApp(){
   listenUsersFromFirebase();
   listenTasksFromFirebase();
   listenAlertsFromFirebase();
+  listenFlowchartsFromFirebase();
 
   checkOverdue();
   navigate('workspace');
