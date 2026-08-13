@@ -2077,10 +2077,47 @@ async function createFlowchart(){
     toast('Não foi possível salvar o fluxograma.');
   }
 }
-function deleteFlowchart(id){
+async function deleteFlowchart(id){
+
   if(!confirm('Excluir este fluxograma?')) return;
-  DB.set('flowcharts', flowcharts().filter(f=>f.id!==id));
-  renderView();
+
+  // Verifica se o usuário tem permissão
+  if(!can('delete')){
+    toast('Você não tem permissão para excluir fluxogramas.');
+    return;
+  }
+
+  try {
+
+    // Exclui do Firebase
+    await firestore
+      .collection('flowcharts')
+      .doc(id)
+      .delete();
+
+    // Atualiza também o armazenamento local
+    const updatedList = flowcharts().filter(
+      f => f.id !== id
+    );
+
+    DB.set('flowcharts', updatedList);
+
+    console.log(
+      '🗑️ Fluxograma excluído do Firebase:',
+      id
+    );
+
+    renderView();
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao excluir fluxograma do Firebase:',
+      error
+    );
+
+    toast('Não foi possível excluir o fluxograma.');
+  }
 }
 function editFlowchart(id){
   const f = flowcharts().find(x=>x.id===id);
