@@ -2804,31 +2804,150 @@ function renderFlowCanvas(){
    no documento para toda a sessão do editor, evitando acumular um novo
    par de listeners a cada nó criado/recriado (vazamento de memória). */
 let flowDragState = null;
+let flowDragSyncTimer = null;
 document.addEventListener('mousemove', e=>flowDragMove(e.clientX, e.clientY));
 document.addEventListener('touchmove', e=>{ if(flowDragState){ flowDragMove(e.touches[0].clientX, e.touches[0].clientY); } }, {passive:true});
 document.addEventListener('mouseup', flowDragEnd);
 document.addEventListener('touchend', flowDragEnd);
+
+function syncActiveFlowDuringDrag(){
+
+  if(!activeFlow) return;
+
+  // Evita várias gravações simultâneas
+  if(flowDragSyncTimer) return;
+
+  flowDragSyncTimer = setTimeout(async ()=>{
+
+    flowDragSyncTimer = null;
+
+    try{
+
+      await persistActiveFlow();
+
+      console.log(
+        '🔄 Posição do fluxograma sincronizada durante arraste.'
+      );
+
+    }catch(error){
+
+      console.error(
+        '❌ Erro ao sincronizar posição durante arraste:',
+        error
+      );
+
+    }
+
+  }, 100);
+
+}
+
 function flowDragMove(clientX, clientY){
+
   const s = flowDragState;
+
   if(!s) return;
-  if(!s.moved && Math.hypot(clientX-s.sx, clientY-s.sy) > 3){
+
+  if(
+    !s.moved &&
+    Math.hypot(
+      clientX - s.sx,
+      clientY - s.sy
+    ) > 3
+  ){
+
     s.moved = true;
+
     s.el.classList.add('dragging');
   }
+
   if(!s.moved) return;
-  const nx = Math.max(0, s.ox + (clientX-s.sx));
-  const ny = Math.max(0, s.oy + (clientY-s.sy));
-  s.el.style.left = nx+'px'; s.el.style.top = ny+'px';
-  const node = activeFlow && activeFlow.nodes.find(n=>n.id===s.nid);
-  if(node){ node.x = nx; node.y = ny; }
-  drawFlowEdges();
-}
-function flowDragEnd(){
-  if(flowDragState){
-    flowDragState.el.classList.remove('dragging');
-    if(flowDragState.moved) persistActiveFlow();
-    flowDragState = null;
+
+
+  const nx = Math.max(
+    0,
+    s.ox + (clientX - s.sx)
+  );
+
+  const ny = Math.max(
+    0,
+    s.oy + (clientY - s.sy)
+  );
+
+
+  // Atualização visual imediata
+  s.el.style.left = nx + 'px';
+  s.el.style.top = ny + 'px';
+
+
+  // Atualiza o objeto local
+  const node =
+    activeFlow &&
+    activeFlow.nodes.find(
+      n => n.id === s.nid
+    );
+
+  if(node){
+
+    node.x = nx;
+    node.y = ny;
+
   }
+
+
+  // Atualiza as conexões imediatamente
+  drawFlowEdges();
+
+
+  // Sincroniza com outros usuários
+  syncActiveFlowDuringDrag();
+
+}
+async function flowDragEnd(){
+
+  const s = flowDragState;
+
+  if(!s) return;
+
+
+  s.el.classList.remove('dragging');
+
+
+  if(s.moved){
+
+    // Cancela uma sincronização intermediária pendente
+    if(flowDragSyncTimer){
+
+      clearTimeout(flowDragSyncTimer);
+
+      flowDragSyncTimer = null;
+
+    }
+
+
+    // Salva imediatamente a posição final
+    try{
+
+      await persistActiveFlow();
+
+      console.log(
+        '✅ Posição final do fluxograma salva.'
+      );
+
+    }catch(error){
+
+      console.error(
+        '❌ Erro ao salvar posição final do fluxograma:',
+        error
+      );
+
+    }
+
+  }
+
+
+  flowDragState = null;
+
 }
 
 function wireNode(el, nid){
