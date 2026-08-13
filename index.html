@@ -700,6 +700,32 @@ function listenFlowchartsFromFirebase(){
         `🔄 ${firebaseFlowcharts.length} fluxograma(s) atualizado(s) em tempo real.`
       );
 
+      // Se existe um fluxograma aberto, verifica
+      // se ele foi alterado no Firebase
+      if(activeFlow){
+
+        const updatedFlow = firebaseFlowcharts.find(
+          f => f.id === activeFlow.id
+        );
+
+        if(updatedFlow){
+
+          // Atualiza o fluxograma aberto
+          activeFlow = JSON.parse(
+            JSON.stringify(updatedFlow)
+          );
+
+          renderFlowCanvas();
+
+          console.log(
+            '🔄 Fluxograma aberto atualizado em tempo real:',
+            activeFlow.id
+          );
+
+        }
+
+      }
+
     }, error => {
 
       console.error(
