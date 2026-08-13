@@ -2015,21 +2015,110 @@ function renderAlerts(){
 let activeFlow = null;
 
 function renderFlowList(){
+
   const list = flowcharts();
+  const canEditFlow = can('edit');
+
   return `
   <div class="view-head">
-    <div><h2>Fluxograma</h2><p>Modele passo a passo de procedimentos com etapas e setas</p></div>
-    <div class="head-actions"><button class="btn btn-primary" onclick="createFlowchart()">+ Novo fluxograma</button></div>
+
+    <div>
+      <h2>Fluxograma</h2>
+      <p>Modele passo a passo de procedimentos com etapas e setas</p>
+    </div>
+
+    <div class="head-actions">
+
+      ${canEditFlow ? `
+        <button
+          class="btn btn-primary"
+          onclick="createFlowchart()">
+          + Novo fluxograma
+        </button>
+      ` : ''}
+
+    </div>
+
   </div>
-  ${list.length ? `<div class="flow-list-grid">${list.map(f=>`
-    <div class="flow-card" onclick="editFlowchart('${f.id}')">
-      <button class="icon-btn del" onclick="event.stopPropagation();deleteFlowchart('${f.id}')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-      <h4>${escapeHtml(f.name)}</h4>
-      <div class="meta">${(f.nodes||[]).length} etapas · ${(f.edges||[]).length} conexões</div>
-    </div>`).join('')}</div>` : `<div class="card"><div class="empty-state"><p>Nenhum fluxograma criado ainda. Comece um novo procedimento acima.</p></div></div>`}
+
+  ${
+    list.length
+
+    ? `
+      <div class="flow-list-grid">
+
+        ${list.map(f => `
+
+          <div
+            class="flow-card"
+            onclick="editFlowchart('${f.id}')">
+
+            ${
+              canEditFlow
+              ? `
+                <button
+                  class="icon-btn del"
+                  onclick="event.stopPropagation();deleteFlowchart('${f.id}')"
+                  title="Excluir">
+
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2">
+
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+
+                  </svg>
+
+                </button>
+              `
+              : ''
+            }
+
+            <h4>${escapeHtml(f.name)}</h4>
+
+            <div class="meta">
+              ${(f.nodes || []).length} etapas ·
+              ${(f.edges || []).length} conexões
+            </div>
+
+          </div>
+
+        `).join('')}
+
+      </div>
+    `
+
+    : `
+      <div class="card">
+
+        <div class="empty-state">
+
+          <p>
+            Nenhum fluxograma criado ainda.
+            ${
+              canEditFlow
+              ? 'Comece um novo procedimento acima.'
+              : ''
+            }
+          </p>
+
+        </div>
+
+      </div>
+    `
+  }
+
   `;
 }
 async function createFlowchart(){
+
+  if(!can('edit')){
+  toast('Você não tem permissão para criar fluxogramas.');
+  return;
+}
 
   const f = {
     id: uid(),
