@@ -1936,23 +1936,102 @@ function kanbanCard(t){
     </div>` : ''}
   </div>`;
 }
-function moveKanban(taskId, delta){
+async function moveKanban(taskId, delta){
+
   let t = tasks();
-  const task = t.find(x=>x.id===taskId);
-  if(!can('edit', task)){ toast('Você não tem permissão para mover esta tarefa.'); return; }
-  const idx = KANBAN_COLS.findIndex(c=>c.status===task.status);
-  const newIdx = Math.min(KANBAN_COLS.length-1, Math.max(0, idx+delta));
-  const newStatus = KANBAN_COLS[newIdx].status;
-  if(newStatus===task.status) return;
-  const prevStatus = task.status;
-  task.status = newStatus;
-  logHistory(task, `moveu de "${STATUS_LABEL[prevStatus]}" para "${STATUS_LABEL[newStatus]}"`);
-  DB.set('tasks', t);
-  if(newStatus==='concluida'){
-    const notify = new Set([task.createdBy]);
-    users().filter(u=>u.role==='admin'||u.role==='supervisor').forEach(u=>notify.add(u.id));
-    pushAlert([...notify], 'concluido', 'ok', `"${task.title}" foi concluída por ${state.currentUser.name}.`, task.id);
+
+  const task = t.find(x => x.id === taskId);
+
+  if(!task){
+    toast('Tarefa não encontrada.');
+    return;
   }
+
+  if(!can('edit', task)){
+    toast('Você não tem permissão para mover esta tarefa.');
+    return;
+  }
+
+  const idx = KANBAN_COLS.findIndex(
+    c => c.status === task.status
+  );
+
+  const newIdx = Math.min(
+    KANBAN_COLS.length - 1,
+    Math.max(0, idx + delta)
+  );
+
+  const newStatus = KANBAN_COLS[newIdx].status;
+
+  if(newStatus === task.status) return;
+
+  const prevStatus = task.status;
+
+  task.status = newStatus;
+
+  logHistory(
+    task,
+    `moveu de "${STATUS_LABEL[prevStatus]}" para "${STATUS_LABEL[newStatus]}"`
+  );
+
+  // Atualiza imediatamente o armazenamento local
+  DB.set('tasks', t);
+
+  // Salva a alteração no Firebase
+  try {
+
+    await saveTaskToFirebase(task);
+
+    console.log(
+      `✅ Status da tarefa ${task.id} atualizado no Firebase: ${prevStatus} → ${newStatus}`
+    );
+
+  } catch(error) {
+
+    console.error(
+      '❌ Erro ao salvar mudança de status no Firebase:',
+      error
+    );
+
+    // Reverte localmente caso o Firebase falhe
+    task.status = prevStatus;
+
+    DB.set('tasks', t);
+
+    toast(
+      'A tarefa foi movida localmente, mas não foi salva no Firebase.'
+    );
+
+    renderView();
+
+    return;
+  }
+
+
+  // Alerta de conclusão
+  if(newStatus === 'concluida'){
+
+    const notify = new Set([
+      task.createdBy
+    ]);
+
+    users()
+      .filter(
+        u => u.role === 'admin' ||
+             u.role === 'supervisor'
+      )
+      .forEach(u => notify.add(u.id));
+
+    await pushAlert(
+      [...notify],
+      'concluido',
+      'ok',
+      `"${task.title}" foi concluída por ${state.currentUser.name}.`,
+      task.id
+    );
+
+  }
+
   renderView();
 }
 function kbDragStart(ev, taskId){
