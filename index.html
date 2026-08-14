@@ -1491,15 +1491,6 @@ async function toggleTask(id){
   taskResponsibleIds(task)
     .forEach(id => notify.add(id));
 
-  // Administradores e supervisores
-  users()
-    .filter(
-      u =>
-        u.role === 'admin' ||
-        u.role === 'supervisor'
-    )
-    .forEach(u => notify.add(u.id));
-
   console.log(
     '🔔 Destinatários do alerta de conclusão:',
     [...notify]
