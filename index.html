@@ -1697,11 +1697,17 @@ async function saveTask(id){
   if(timeStart && timeEnd && timeEnd < timeStart){ const tmp=timeStart; timeStart=timeEnd; timeEnd=tmp; }
   const description = document.getElementById('tf-desc').value.trim();
   const seenIds = new Set();
-  const responsibles = modalResponsibles.filter(r=>{
+  const responsibles = modalResponsibles
+  .filter(r=>{
     if(!r.userId || seenIds.has(r.userId)) return false;
     seenIds.add(r.userId);
     return true;
-  });
+  })
+  .map(r=>({
+    userId: r.userId,
+    name: userById(r.userId)?.name || r.name || 'Usuário removido',
+    role: r.role || ''
+  }));
   if(responsibles.length===0){ toast('Adicione ao menos um responsável.'); return; }
   if(responsibles.length < modalResponsibles.filter(r=>r.userId).length){ toast('Removi responsáveis duplicados automaticamente.'); }
 
