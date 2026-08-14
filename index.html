@@ -1012,6 +1012,42 @@ function listenUsersFromFirebase(){
       // Atualiza os usuários localmente
       DB.set('users', firebaseUsers);
 
+      if(state.currentUser){
+
+        const updatedCurrentUser = firebaseUsers.find(
+          u => u.id === state.currentUser.id
+        );
+
+        if(updatedCurrentUser){
+
+          const oldRole = state.currentUser.role;
+
+          // Atualiza os dados do usuário logado
+          state.currentUser = {
+            ...state.currentUser,
+            ...updatedCurrentUser
+          };
+
+          // Se o cargo mudou, atualiza a interface imediatamente
+          if(oldRole !== updatedCurrentUser.role){
+
+            console.log(
+              `🔄 Cargo atualizado em tempo real: ${ROLE_LABEL(oldRole)} → ${ROLE_LABEL(updatedCurrentUser.role)}`
+            );
+
+            document.getElementById('side-name').textContent =
+              state.currentUser.name;
+
+            document.getElementById('side-role').textContent =
+              ROLE_LABEL(state.currentUser.role);
+
+            buildNav();
+            renderView();
+            updateAlertBadges();
+          }
+        }
+      }
+
       console.log(
         `👥 Usuários atualizados em tempo real: ${firebaseUsers.length}`
       );
