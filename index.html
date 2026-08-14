@@ -1478,21 +1478,41 @@ async function toggleTask(id){
       task.id
     );
 
-    if(task.status==='concluida'){
-      const notify = new Set([task.createdBy]);
+    if(task.status === 'concluida'){
 
-      users()
-        .filter(u=>u.role==='admin'||u.role==='supervisor')
-        .forEach(u=>notify.add(u.id));
+  const notify = new Set();
 
-      pushAlert(
-        [...notify],
-        'concluido',
-        'ok',
-        `"${task.title}" foi concluída por ${state.currentUser.name}.`,
-        task.id
-      );
-    }
+  // Criador da tarefa
+  if(task.createdBy){
+    notify.add(task.createdBy);
+  }
+
+  // Responsáveis pela tarefa
+  taskResponsibleIds(task)
+    .forEach(id => notify.add(id));
+
+  // Administradores e supervisores
+  users()
+    .filter(
+      u =>
+        u.role === 'admin' ||
+        u.role === 'supervisor'
+    )
+    .forEach(u => notify.add(u.id));
+
+  console.log(
+    '🔔 Destinatários do alerta de conclusão:',
+    [...notify]
+  );
+
+  await pushAlert(
+    [...notify],
+    'concluido',
+    'ok',
+    `"${task.title}" foi concluída por ${state.currentUser.name}.`,
+    task.id
+  );
+}
 
     renderView();
 
