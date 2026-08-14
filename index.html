@@ -3409,20 +3409,86 @@ function saveMyProfile(){
   toast('Perfil atualizado.');
   renderView();
 }
-function changeRole(id, role){
-  if(state.currentUser.role!=='admin'){ toast('Apenas administradores podem alterar perfis.'); renderView(); return; }
+async function changeRole(id, role){
+
+  if(state.currentUser.role !== 'admin'){
+    toast('Apenas administradores podem alterar perfis.');
+    renderView();
+    return;
+  }
+
   let list = users();
-  const target = list.find(u=>u.id===id);
-  const adminCount = list.filter(u=>u.role==='admin').length;
-  if(target.role==='admin' && role!=='admin' && adminCount<=1){
+
+  const target = list.find(u => u.id === id);
+
+  if(!target){
+    toast('Usuário não encontrado.');
+    return;
+  }
+
+  const adminCount =
+    list.filter(u => u.role === 'admin').length;
+
+  // Impede remover o último administrador
+  if(
+    target.role === 'admin' &&
+    role !== 'admin' &&
+    adminCount <= 1
+  ){
     toast('Deve haver ao menos um administrador no sistema.');
     renderView();
     return;
   }
-  target.role = role;
-  DB.set('users', list);
-  toast('Perfil de acesso atualizado.');
-  renderView();
+
+  try{
+
+    // Atualiza o objeto local
+    target.role = role;
+
+    // Salva no Firebase
+    await firestore
+      .collection('users')
+      .doc(target.id)
+      .set(target, { merge: true });
+
+    // Atualiza o armazenamento local
+    DB.set('users', list);
+
+    // Se o usuário alterado for o usuário atualmente logado,
+    // atualiza imediatamente a sessão dele
+    if(state.currentUser.id === target.id){
+
+      state.currentUser = {
+        ...state.currentUser,
+        role: role
+      };
+
+      // Atualiza a sessão salva
+      DB.set('session', state.currentUser.id);
+    }
+
+    toast('Perfil de acesso atualizado.');
+
+    // Reconstrói a navegação para aplicar as novas permissões
+    buildNav();
+
+    renderView();
+
+    console.log(
+      `✅ Perfil de ${target.name} atualizado para ${role} no Firebase.`
+    );
+
+  }catch(error){
+
+    console.error(
+      '❌ Erro ao atualizar perfil no Firebase:',
+      error
+    );
+
+    toast(
+      'Não foi possível atualizar o perfil no Firebase.'
+    );
+  }
 }
 function deleteUser(id){
   if(state.currentUser.role!=='admin'){ toast('Apenas administradores podem excluir usuários.'); return; }
