@@ -1073,14 +1073,38 @@ async function doLogin(){
     err.style.display = 'block';
   }
 }
-function doLogout(){
+async function doLogout(){
+
+  try{
+    // Encerra a sessão no Firebase
+    await auth.signOut();
+  }catch(error){
+    console.error('❌ Erro ao encerrar sessão Firebase:', error);
+  }
+
+  // Limpa o usuário atual
   state.currentUser = null;
+
+  // Limpa a sessão usada pelo restore()
+  DB.set('session', null);
+
+  // Limpa filtros temporários
   resetSessionFilters();
-  localStorage.removeItem('praxis_session');
+
+  // Não precisamos apagar lastView.
+  // Ele pode continuar salvo para o próximo login.
+
+  // Sai da aplicação
   document.getElementById('app').classList.remove('active');
+
+  // Volta para o login
   document.getElementById('login-screen').style.display='flex';
+
+  // Limpa os campos
   document.getElementById('login-user').value='';
   document.getElementById('login-pass').value='';
+
+  console.log('🚪 Sessão encerrada corretamente.');
 }
 async function enterApp(){
   document.getElementById('login-screen').style.display='none';
@@ -1107,7 +1131,7 @@ async function enterApp(){
   listenFlowchartsFromFirebase();
 
   checkOverdue();
-  
+
   const lastView = DB.get('lastView', 'workspace');
   navigate(lastView);
 }
