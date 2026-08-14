@@ -1650,8 +1650,9 @@ function openTaskModal(id){
   const task = id ? tasks().find(t=>t.id===id) : null;
   const editable = task ? can('edit', task) : true;
   const cu = state.currentUser;
-  modalResponsibles = task ? JSON.parse(JSON.stringify(task.responsibles||[])) : [{userId:cu.id, role:''}];
-  if(modalResponsibles.length===0) modalResponsibles = [{userId:cu.id, role:''}];
+  modalResponsibles = task
+    ? JSON.parse(JSON.stringify(task.responsibles || []))
+    : [];
 
   const commentsHtml = task && task.comments && task.comments.length ? task.comments.map(c=>`
     <div class="comment-item"><b>${escapeHtml(userById(c.userId)?.name||'—')}</b> · <span style="color:var(--ink-soft)">${timeAgo(c.at)}</span><br>${escapeHtml(c.text)}</div>
