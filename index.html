@@ -986,7 +986,10 @@ function listenUsersFromFirebase(){
         ...doc.data()
       }));
 
-      // Verifica se o usuário atualmente logado ainda existe
+      // ============================================================
+      // VERIFICA SE O USUÁRIO LOGADO AINDA EXISTE
+      // ============================================================
+
       if(state.currentUser){
 
         const currentUserExists = firebaseUsers.some(
@@ -1009,8 +1012,17 @@ function listenUsersFromFirebase(){
         }
       }
 
-      // Atualiza os usuários localmente
+
+      // ============================================================
+      // ATUALIZA A LISTA LOCAL DE USUÁRIOS
+      // ============================================================
+
       DB.set('users', firebaseUsers);
+
+
+      // ============================================================
+      // ATUALIZA O USUÁRIO LOGADO EM TEMPO REAL
+      // ============================================================
 
       if(state.currentUser){
 
@@ -1020,7 +1032,30 @@ function listenUsersFromFirebase(){
 
         if(updatedCurrentUser){
 
+          // LOGS PARA TESTE
+          console.log(
+            '👤 Usuário logado atual:',
+            state.currentUser
+          );
+
+          console.log(
+            '👤 Usuário recebido do Firebase:',
+            updatedCurrentUser
+          );
+
+          console.log(
+            '🎭 Cargo atual:',
+            state.currentUser.role
+          );
+
+          console.log(
+            '🎭 Cargo no Firebase:',
+            updatedCurrentUser.role
+          );
+
+
           const oldRole = state.currentUser.role;
+
 
           // Atualiza os dados do usuário logado
           state.currentUser = {
@@ -1028,29 +1063,71 @@ function listenUsersFromFirebase(){
             ...updatedCurrentUser
           };
 
-          // Se o cargo mudou, atualiza a interface imediatamente
+
+          console.log(
+            '🔄 Comparação de cargos:',
+            oldRole,
+            '→',
+            state.currentUser.role
+          );
+
+
+          // ========================================================
+          // SE O CARGO MUDOU
+          // ========================================================
+
           if(oldRole !== updatedCurrentUser.role){
+
+            console.log(
+              '🚨 CARGO REALMENTE MUDOU!'
+            );
 
             console.log(
               `🔄 Cargo atualizado em tempo real: ${ROLE_LABEL(oldRole)} → ${ROLE_LABEL(updatedCurrentUser.role)}`
             );
 
-            document.getElementById('side-name').textContent =
-              state.currentUser.name;
 
-            document.getElementById('side-role').textContent =
-              ROLE_LABEL(state.currentUser.role);
+            // Atualiza nome e cargo na lateral
+            const sideName = document.getElementById('side-name');
+            const sideRole = document.getElementById('side-role');
 
+            if(sideName){
+              sideName.textContent =
+                state.currentUser.name;
+            }
+
+            if(sideRole){
+              sideRole.textContent =
+                ROLE_LABEL(state.currentUser.role);
+            }
+
+
+            // Reconstrói a navegação
             buildNav();
+
+
+            // Reconstrói a tela atual
             renderView();
+
+
+            // Atualiza os badges
             updateAlertBadges();
+
           }
+
         }
+
       }
+
+
+      // ============================================================
+      // LOG GERAL
+      // ============================================================
 
       console.log(
         `👥 Usuários atualizados em tempo real: ${firebaseUsers.length}`
       );
+
 
     }, error => {
 
