@@ -986,46 +986,31 @@ function listenUsersFromFirebase(){
         ...doc.data()
       }));
 
-      // Atualiza usuários no armazenamento local
-      DB.set('users', firebaseUsers);
-
-      // Verifica se o usuário atualmente logado
-      // teve alguma informação alterada
+      // Verifica se o usuário atualmente logado ainda existe
       if(state.currentUser){
 
-        const updatedCurrentUser = firebaseUsers.find(
+        const currentUserExists = firebaseUsers.some(
           u => u.id === state.currentUser.id
         );
 
-        if(updatedCurrentUser){
+        if(!currentUserExists){
 
-          const roleChanged =
-            state.currentUser.role !== updatedCurrentUser.role;
+          console.warn(
+            '⚠️ O usuário atualmente logado foi removido do sistema.'
+          );
 
-          // Atualiza a sessão atual com os dados mais recentes
-          state.currentUser = {
-            ...state.currentUser,
-            ...updatedCurrentUser
-          };
+          toast(
+            'Seu usuário foi removido do sistema. Você será desconectado.'
+          );
 
-          // Se o cargo mudou, reconstrói a interface
-          if(roleChanged){
+          doLogout();
 
-            console.log(
-              `🔄 Seu perfil foi atualizado: ${ROLE_LABEL(updatedCurrentUser.role)}`
-            );
-
-            buildNav();
-            renderView();
-
-            toast(
-              `Seu perfil foi atualizado para ${ROLE_LABEL(updatedCurrentUser.role)}.`
-            );
-          }
-
+          return;
         }
-
       }
+
+      // Atualiza os usuários localmente
+      DB.set('users', firebaseUsers);
 
       console.log(
         `👥 Usuários atualizados em tempo real: ${firebaseUsers.length}`
