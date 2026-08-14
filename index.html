@@ -2164,35 +2164,30 @@ function wireKanbanDom(){
 
         if(newStatus === 'concluida'){
 
-        const notify = new Set();
+  const notify = new Set();
 
-        // Criador
-        if(task.createdBy){
-          notify.add(task.createdBy);
-        }
+  // Criador da tarefa
+  if(task.createdBy){
+    notify.add(task.createdBy);
+  }
 
-        // Responsáveis
-        taskResponsibleIds(task)
-          .forEach(id => notify.add(id));
+  // Responsáveis pela tarefa
+  taskResponsibleIds(task)
+    .forEach(id => notify.add(id));
 
-        // Admins e supervisores
-        users()
-          .filter(
-            u =>
-              u.role === 'admin' ||
-              u.role === 'supervisor'
-          )
-          .forEach(u => notify.add(u.id));
+  console.log(
+    '🔔 Destinatários do alerta de conclusão:',
+    [...notify]
+  );
 
-        await pushAlert(
-          [...notify],
-          'concluido',
-          'ok',
-          `"${task.title}" foi concluída por ${state.currentUser.name}.`,
-          task.id
-        );
-
-      }
+  await pushAlert(
+    [...notify],
+    'concluido',
+    'ok',
+    `"${task.title}" foi concluída por ${state.currentUser.name}.`,
+    task.id
+  );
+}
 
         renderView();
 
