@@ -2061,33 +2061,40 @@ async function moveKanban(taskId, delta){
 
 
   // Alerta de conclusão
-
-  console.log('🔎 Tarefa concluída:', task);
-  console.log('👥 Responsáveis:', task.responsibles);
-  console.log('🆔 IDs dos responsáveis:', taskResponsibleIds(task));
-
   if(newStatus === 'concluida'){
 
-    const notify = new Set([
-      task.createdBy
-    ]);
+  console.log('🔎 ID da tarefa:', task.id);
+  console.log('🔎 Criador:', task.createdBy);
+  console.log('🔎 Responsibles:', task.responsibles);
+  console.log('🔎 IDs responsáveis:', taskResponsibleIds(task));
 
-    users()
-      .filter(
-        u => u.role === 'admin' ||
-             u.role === 'supervisor'
-      )
-      .forEach(u => notify.add(u.id));
+  const notify = new Set();
 
-    await pushAlert(
-      [...notify],
-      'concluido',
-      'ok',
-      `"${task.title}" foi concluída por ${state.currentUser.name}.`,
-      task.id
-    );
-
+  if(task.createdBy){
+    notify.add(task.createdBy);
   }
+
+  taskResponsibleIds(task)
+    .forEach(id => notify.add(id));
+
+  users()
+    .filter(
+      u =>
+        u.role === 'admin' ||
+        u.role === 'supervisor'
+    )
+    .forEach(u => notify.add(u.id));
+
+  console.log('🔔 Destinatários finais:', [...notify]);
+
+  await pushAlert(
+    [...notify],
+    'concluido',
+    'ok',
+    `"${task.title}" foi concluída por ${state.currentUser.name}.`,
+    task.id
+  );
+}
 
   renderView();
 }
