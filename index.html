@@ -3529,16 +3529,84 @@ async function changeRole(id, role){
     );
   }
 }
-function deleteUser(id){
-  if(state.currentUser.role!=='admin'){ toast('Apenas administradores podem excluir usuários.'); return; }
+async function deleteUser(id){
+
+  if(state.currentUser.role !== 'admin'){
+    toast('Apenas administradores podem excluir usuários.');
+    return;
+  }
+
   const list = users();
-  const target = list.find(u=>u.id===id);
-  const adminCount = list.filter(u=>u.role==='admin').length;
-  if(target.role==='admin' && adminCount<=1){ toast('Deve haver ao menos um administrador no sistema.'); return; }
-  if(!confirm('Excluir este usuário? As tarefas atribuídas a ele permanecerão registradas.')) return;
-  DB.set('users', list.filter(u=>u.id!==id));
-  toast('Usuário excluído.');
-  renderView();
+
+  const target = list.find(u => u.id === id);
+
+  if(!target){
+    toast('Usuário não encontrado.');
+    return;
+  }
+
+  const adminCount =
+    list.filter(u => u.role === 'admin').length;
+
+  // Impede excluir o último administrador
+  if(
+    target.role === 'admin' &&
+    adminCount <= 1
+  ){
+    toast('Deve haver ao menos um administrador no sistema.');
+    return;
+  }
+
+  // Impede excluir o próprio usuário logado
+  if(target.id === state.currentUser.id){
+    toast('Você não pode excluir seu próprio usuário.');
+    return;
+  }
+
+  if(
+    !confirm(
+      `Excluir o usuário "${target.name}"?\n\n` +
+      `As tarefas atribuídas a ele permanecerão registradas.`
+    )
+  ){
+    return;
+  }
+
+  try{
+
+    // 1. Exclui o documento do usuário no Firestore
+    await firestore
+      .collection('users')
+      .doc(target.id)
+      .delete();
+
+    console.log(
+      '✅ Usuário removido do Firestore:',
+      target.id
+    );
+
+    // 2. Remove também do armazenamento local
+    const updatedList =
+      list.filter(u => u.id !== id);
+
+    DB.set('users', updatedList);
+
+    toast('Usuário excluído do PRAXIS.');
+
+    renderView();
+
+  }catch(error){
+
+    console.error(
+      '❌ Erro ao excluir usuário do Firebase:',
+      error
+    );
+
+    toast(
+      'Não foi possível excluir o usuário do Firebase.'
+    );
+  }
+
 }
 function openNewUserModal(){
   const html = `
