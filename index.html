@@ -428,6 +428,15 @@ textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius
 .overlay-scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:55;display:none;}
 .overlay-scrim.show{display:block;}
 
+.task-no-responsible{
+  display:inline-block;
+  margin-left:7px;
+  font-size:10.5px;
+  font-weight:700;
+  color:var(--danger);
+  opacity:.9;
+}
+
 /* Mobile */
 @media (max-width:880px){
   .sidebar{position:fixed;top:0;bottom:0;left:0;margin-left:-250px;box-shadow:0 0 40px rgba(0,0,0,.3);}
@@ -1423,6 +1432,11 @@ function respLabel(t){
 function taskChip(task){
   const overdue = task.status!=='concluida' && task.dateEnd < todayISO();
   const editable = can('edit', task);
+
+  const hasResponsible = hasActiveResponsible(task);
+  const noResponsibleWarning =
+    task.status !== 'concluida' && !hasResponsible;
+
   const statusLabel = {afazer:'A Fazer', fazendo:'Fazendo', concluida:'Concluído'}[task.status] || task.status;
   return `
   <div class="task-row ${overdue?'overdue':''}" data-task="${task.id}">
@@ -1439,13 +1453,21 @@ function taskChip(task){
         ${task.status!=='concluida' ? `<span class="badge badge-status">${statusLabel}</span>` : ''}
         ${overdue?'<span class="badge badge-overdue">Atrasado</span>':''}
         <span class="dot"></span>
-        <span>${escapeHtml(respLabel(task))}</span>
+        <span>
+          ${escapeHtml(respLabel(task))}
+          ${noResponsibleWarning
+            ? `<span class="task-no-responsible">⚠ Sem responsável ativo</span>`
+            : ''}
+        </span>
       </div>
     </div>
     <div class="task-actions">
       ${can('delete', task) ? `<button class="icon-btn" onclick="deleteTask('${task.id}')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`:''}
     </div>
   </div>`;
+  function hasActiveResponsible(t){
+  return (t.responsibles || []).some(r => userById(r.userId));
+}
 }
 function renderWorkspace(){
   const cu = state.currentUser;
