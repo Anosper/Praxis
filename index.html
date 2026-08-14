@@ -977,7 +977,46 @@ function listenUsersFromFirebase(){
         ...doc.data()
       }));
 
+      // Atualiza usuários no armazenamento local
       DB.set('users', firebaseUsers);
+
+      // Verifica se o usuário atualmente logado
+      // teve alguma informação alterada
+      if(state.currentUser){
+
+        const updatedCurrentUser = firebaseUsers.find(
+          u => u.id === state.currentUser.id
+        );
+
+        if(updatedCurrentUser){
+
+          const roleChanged =
+            state.currentUser.role !== updatedCurrentUser.role;
+
+          // Atualiza a sessão atual com os dados mais recentes
+          state.currentUser = {
+            ...state.currentUser,
+            ...updatedCurrentUser
+          };
+
+          // Se o cargo mudou, reconstrói a interface
+          if(roleChanged){
+
+            console.log(
+              `🔄 Seu perfil foi atualizado: ${ROLE_LABEL(updatedCurrentUser.role)}`
+            );
+
+            buildNav();
+            renderView();
+
+            toast(
+              `Seu perfil foi atualizado para ${ROLE_LABEL(updatedCurrentUser.role)}.`
+            );
+          }
+
+        }
+
+      }
 
       console.log(
         `👥 Usuários atualizados em tempo real: ${firebaseUsers.length}`
