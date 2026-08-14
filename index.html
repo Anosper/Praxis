@@ -1403,9 +1403,22 @@ function renderView(){
 function respLabel(t){
   return (t.responsibles||[]).map(r=>{
     const u = userById(r.userId);
-    if(!u) return null;
-    return r.role ? `${u.name} (${r.role})` : u.name;
-  }).filter(Boolean).join(', ') || '—';
+
+    // Usuário ainda existe
+    if(u){
+      return r.role
+        ? `${u.name} (${r.role})`
+        : u.name;
+    }
+
+    // Usuário foi removido, mas o nome ficou salvo na tarefa
+    const oldName = r.name || 'Usuário removido';
+
+    return r.role
+      ? `${oldName} (${r.role}) — usuário removido`
+      : `${oldName} — usuário removido`;
+
+  }).join(', ') || '—';
 }
 function taskChip(task){
   const overdue = task.status!=='concluida' && task.dateEnd < todayISO();
