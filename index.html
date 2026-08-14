@@ -2074,29 +2074,21 @@ async function moveKanban(taskId, delta){
   // Alerta de conclusão
   if(newStatus === 'concluida'){
 
-  console.log('🔎 ID da tarefa:', task.id);
-  console.log('🔎 Criador:', task.createdBy);
-  console.log('🔎 Responsibles:', task.responsibles);
-  console.log('🔎 IDs responsáveis:', taskResponsibleIds(task));
-
   const notify = new Set();
 
+  // Criador da tarefa
   if(task.createdBy){
     notify.add(task.createdBy);
   }
 
+  // Responsáveis pela tarefa
   taskResponsibleIds(task)
     .forEach(id => notify.add(id));
 
-  users()
-    .filter(
-      u =>
-        u.role === 'admin' ||
-        u.role === 'supervisor'
-    )
-    .forEach(u => notify.add(u.id));
-
-  console.log('🔔 Destinatários finais:', [...notify]);
+  console.log(
+    '🔔 Destinatários do alerta de conclusão:',
+    [...notify]
+  );
 
   await pushAlert(
     [...notify],
