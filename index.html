@@ -2147,22 +2147,37 @@ function wireKanbanDom(){
 
         console.log('✅ Status atualizado pelo Kanban:', task.id);
 
-        if(newStatus==='concluida'){
+        if(newStatus === 'concluida'){
 
-          const notify = new Set([task.createdBy]);
+        const notify = new Set();
 
-          users()
-            .filter(u=>u.role==='admin'||u.role==='supervisor')
-            .forEach(u=>notify.add(u.id));
-
-          pushAlert(
-            [...notify],
-            'concluido',
-            'ok',
-            `"${task.title}" foi concluída por ${state.currentUser.name}.`,
-            task.id
-          );
+        // Criador
+        if(task.createdBy){
+          notify.add(task.createdBy);
         }
+
+        // Responsáveis
+        taskResponsibleIds(task)
+          .forEach(id => notify.add(id));
+
+        // Admins e supervisores
+        users()
+          .filter(
+            u =>
+              u.role === 'admin' ||
+              u.role === 'supervisor'
+          )
+          .forEach(u => notify.add(u.id));
+
+        await pushAlert(
+          [...notify],
+          'concluido',
+          'ok',
+          `"${task.title}" foi concluída por ${state.currentUser.name}.`,
+          task.id
+        );
+
+      }
 
         renderView();
 
