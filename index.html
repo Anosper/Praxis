@@ -2061,6 +2061,11 @@ async function moveKanban(taskId, delta){
 
 
   // Alerta de conclusão
+
+  console.log('🔎 Tarefa concluída:', task);
+  console.log('👥 Responsáveis:', task.responsibles);
+  console.log('🆔 IDs dos responsáveis:', taskResponsibleIds(task));
+
   if(newStatus === 'concluida'){
 
     const notify = new Set([
